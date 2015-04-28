@@ -713,6 +713,96 @@ static PyObject *Table_repr(TableObject *self)
 			self->errcb ? pystos(PyObject_Repr(self->errcb)) : "None");
 }
 
+static PyObject *Table_iter(PyObject *self)
+{
+	return PyObject_CallFunctionObjArgs((PyObject *)&TableIterType, self, NULL);
+}
+
+static PyObject *TableIter_new(PyTypeObject *type, PyObject *args, PyObject *kwds __attribute__((unused)))
+{
+	TableIterObject *self;
+	PyObject *table;
+
+	if (!PyArg_UnpackTuple(args, "table", 1, 1, &table))
+		return NULL;
+
+	self = (TableIterObject *)type->tp_alloc(type, 0);
+	if (self) {
+		DBG(TAB, pymnt_debug_h(self, "new iter (table %p)", table));
+
+		Py_INCREF(table);
+		self->table = (TableObject *)table;
+		self->iter = mnt_new_iter(MNT_ITER_FORWARD);
+	}
+	return (PyObject *)self;
+}
+
+static void TableIter_dealloc(TableIterObject *self)
+{
+	DBG(TAB, pymnt_debug_h(self, "del iter (table %p)", self->table));
+
+	mnt_free_iter(self->iter);
+	Py_XDECREF(self->table);
+	PyFree(self);
+}
+
+static PyObject *TableIter_iternext(TableIterObject *self)
+{
+	int rc;
+	struct libmnt_fs *fs;
+
+	rc = mnt_table_next_fs(self->table->tab, self->iter, &fs);
+	if (rc == 0) {
+		return PyObjectResultFs(fs);
+	} else if (rc < 0) {
+		return UL_RaiseExc(-rc);
+	} else {
+		PyErr_SetNone(PyExc_StopIteration);
+		return NULL;
+	}
+}
+
+PyTypeObject TableIterType = {
+	PyVarObject_HEAD_INIT(NULL, 0)
+	"libmount._TableIter", /* tp_name */
+	sizeof(TableIterObject), /* tp_basicsize */
+    0, /* tp_itemsize */
+    (destructor)TableIter_dealloc, /*tp_dealloc*/
+    0, /* tp_print */
+    0, /* tp_getattr */
+    0, /* tp_setattr */
+    0, /* tp_compare */
+    0, /* tp_repr */
+    0, /* tp_as_number */
+    0, /* tp_as_sequence */
+    0, /* tp_as_mapping */
+    0, /* tp_hash */
+    0, /* tp_call */
+    0, /* tp_str */
+    0, /* tp_getattro */
+    0, /* tp_setattro */
+    0, /* tp_as_buffer */
+    Py_TPFLAGS_DEFAULT|Py_TPFLAGS_HAVE_ITER, /* tp_flags */
+	"Internal Table iterator object", /* tp_doc */
+	0,  /* tp_traverse */
+	0,  /* tp_clear */
+	0,  /* tp_richcompare */
+	0,  /* tp_weaklistoffset */
+	PyObject_SelfIter, /* tp_iter */
+	(iternextfunc)TableIter_iternext, /* tp_iternext */
+	0, /* tp_methods */
+	0, /* tp_members */
+	0, /* tp_getset */
+	0, /* tp_base */
+	0, /* tp_dict */
+	0, /* tp_descr_get */
+	0, /* tp_descr_set */
+	0, /* tp_dictoffset */
+	0, /* tp_init */
+	0, /* tp_alloc */
+	TableIter_new, /* tp_new */
+};
+
 PyTypeObject TableType = {
 	PyVarObject_HEAD_INIT(NULL, 0)
 	"libmount.Table", /*tp_name*/
@@ -733,13 +823,13 @@ PyTypeObject TableType = {
 	0, /*tp_getattro*/
 	0, /*tp_setattro*/
 	0, /*tp_as_buffer*/
-	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE, /*tp_flags*/
+	Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE|Py_TPFLAGS_HAVE_ITER, /*tp_flags*/
 	Table_HELP, /* tp_doc */
 	0, /* tp_traverse */
 	0, /* tp_clear */
 	0, /* tp_richcompare */
 	0, /* tp_weaklistoffset */
-	0, /* tp_iter */
+	Table_iter, /* tp_iter */
 	0, /* tp_iternext */
 	Table_methods, /* tp_methods */
 	Table_members, /* tp_members */
@@ -758,10 +848,14 @@ void Table_AddModuleObject(PyObject *mod)
 {
 	if (PyType_Ready(&TableType) < 0)
 		return;
+	if (PyType_Ready(&TableIterType) < 0)
+		return;
 
 	DBG(TAB, pymnt_debug("add to module"));
 
 	Py_INCREF(&TableType);
+	Py_INCREF(&TableIterType);
 	PyModule_AddObject(mod, "Table", (PyObject *)&TableType);
+	PyModule_AddObject(mod, "_TableIter", (PyObject *)&TableIterType);
 }
 

@@ -13,6 +13,10 @@
 #define PYMNT_DEBUG_FS		(1 << 3)
 #define PYMNT_DEBUG_CXT		(1 << 4)
 
+#if PY_MAJOR_VERSION >=3
+# define Py_TPFLAGS_HAVE_ITER 0
+#endif
+
 #ifdef CONFIG_PYLIBMOUNT_DEBUG
 # include <stdio.h>
 # include <stdarg.h>
@@ -85,7 +89,15 @@ typedef struct {
 	PyObject			*errcb;
 } TableObject;
 
+typedef struct {
+	PyObject_HEAD
+
+	struct libmnt_iter *iter;
+	TableObject *table;
+} TableIterObject;
+
 extern PyTypeObject TableType;
+extern PyTypeObject TableIterType;
 
 extern PyObject *PyObjectResultTab(struct libmnt_table *tab);
 

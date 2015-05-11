@@ -398,6 +398,11 @@ static PyObject *Fs_get_priority(FsObject *self)
 	return PyObjectResultInt(mnt_fs_get_priority(self->fs));
 }
 
+static PyObject *Fs_get_bindsrc(FsObject *self)
+{
+	return PyObjectResultStr(mnt_fs_get_bindsrc(self->fs));
+}
+
 #define Fs_get_propagation_HELP "get_propagation(flags)\n\n\
 Note that this function set flags to zero if not found any propagation flag\n\
 in mountinfo file. The kernel default is MS_PRIVATE, this flag is not stored\n\
@@ -714,6 +719,7 @@ static PyGetSetDef Fs_getseters[] = {
 	{"priority",	(getter)Fs_get_priority, NULL, "swaps[5]: swap priority", NULL},
 	{"tag",		(getter)Fs_get_tag, NULL, "(Name, Value)", NULL},
 	{"tid",		(getter)Fs_get_tid, NULL, "/proc/<tid>/mountinfo, otherwise zero", NULL},
+	{"bindsrc",	(getter)Fs_get_bindsrc, NULL, "source path if this is a MS_BIND mount, otherwise None", NULL},
 	{NULL}
 };
 

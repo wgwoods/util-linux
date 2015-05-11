@@ -521,27 +521,16 @@ static PyMethodDef Table_methods[] = {
 	{NULL}
 };
 
+
 /* mnt_free_tab() with a few necessary additions */
 void Table_unref(struct libmnt_table *tab)
 {
-	struct libmnt_fs *fs;
-	struct libmnt_iter *iter;
-
 	if (!tab)
 		return;
 
-	DBG(TAB, pymnt_debug_h(tab, "un-referencing filesystems"));
-
-	iter = mnt_new_iter(MNT_ITER_BACKWARD);
-
-	/* remove pylibmount specific references to the entries */
-	while (mnt_table_next_fs(tab, iter, &fs) == 0)
-		Py_XDECREF(mnt_fs_get_userdata(fs));
-
 	DBG(TAB, pymnt_debug_h(tab, "un-referencing table"));
-
+	mnt_table_set_userdata(tab, NULL);
 	mnt_unref_table(tab);
-	mnt_free_iter(iter);
 }
 
 static void Table_destructor(TableObject *self)
@@ -686,17 +675,14 @@ PyObject *PyObjectResultTab(struct libmnt_table *tab)
 		return (PyObject *) result;
 	}
 
-	/* Creating an encapsualing object: increment the refcount, so that
-	 * code such as: cxt.get_fstab() doesn't call the destructor, which
-	 * would free our tab struct as well
-	 */
+	/* Creating an encapsulating object */
 	result = PyObject_New(TableObject, &TableType);
 	if (!result) {
 		UL_RaiseExc(ENOMEM);
 		return NULL;
 	}
 
-	Py_INCREF(result);
+	/* Increment internal refcount for the encapsulated table */
 	mnt_ref_table(tab);
 
 	DBG(TAB, pymnt_debug_h(tab, "result py-obj %p new, py-refcnt=%d",

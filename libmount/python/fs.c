@@ -611,6 +611,7 @@ static void Fs_destructor(FsObject *self)
 {
 	DBG(FS, pymnt_debug_h(self->fs, "destrutor py-obj: %p, py-refcnt=%d",
 				self, (int) ((PyObject *) self)->ob_refcnt));
+	mnt_fs_set_userdata(self->fs, NULL);
 	mnt_unref_fs(self->fs);
 	PyFree(self);
 }
@@ -748,17 +749,14 @@ PyObject *PyObjectResultFs(struct libmnt_fs *fs)
 		return (PyObject *) result;
 	}
 
-	/* Creating an encapsualing object: increment the refcount, so that code
-	 * such as tab.next_fs() doesn't call the destructor, which would free
-	 * our fs struct as well
-	 */
+	/* Creating a new object to encapsulate this fs */
 	result = PyObject_New(FsObject, &FsType);
 	if (!result) {
 		UL_RaiseExc(ENOMEM);
 		return NULL;
 	}
 
-	Py_INCREF(result);
+	/* Increment internal refcount for the encapsulated fs */
 	mnt_ref_fs(fs);
 
 	DBG(FS, pymnt_debug_h(fs, "result py-obj %p new, py-refcnt=%d",
